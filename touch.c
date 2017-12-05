@@ -12,11 +12,9 @@ int main(int argc, char *argv[])
     exit();
   }
 
-  for(i = 1; i < argc; i++){
-    if((fd = open(argv[i], O_CREATE)) < 0){
-      printf(1, "failed create touch: %s \n", argv[i]);
-      break;
-    }
+  if((fd = open(argv[1], O_CREATE | O_RDWR)) < 0){
+     printf(1, "failed create touch: %s \n", argv[1]);
+     break;
   }
   close(fd);
   exit();
