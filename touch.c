@@ -5,7 +5,7 @@
 
 int main(int argc, char *argv[])
 {
-  int fd,i;
+  int fd;
 
   if(argc < 2){
     printf(1, "Use this arguments : touch [namefile]\n");
@@ -14,7 +14,6 @@ int main(int argc, char *argv[])
 
   if((fd = open(argv[1], O_CREATE | O_RDWR)) < 0){
      printf(1, "failed create touch: %s \n", argv[1]);
-     break;
   }
   close(fd);
   exit();
