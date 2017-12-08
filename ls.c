@@ -3,15 +3,13 @@
 #include "user.h"
 #include "fs.h"
 
-char*
-fmtname(char *path)
+char* fname(char *path)
 {
   static char buf[DIRSIZ+1];
   char *p;
 
   // Find first character after last slash.
-  for(p=path+strlen(path); p >= path && *p != '/'; p--)
-    ;
+  for(p=path+strlen(path); p >= path && *p != '/'; p--);
   p++;
 
   // Return blank-padded name.
@@ -22,8 +20,7 @@ fmtname(char *path)
   return buf;
 }
 
-void
-ls(char *path)
+void ls(char *path)
 {
   char buf[512], *p;
   int fd;
@@ -43,7 +40,7 @@ ls(char *path)
 
   switch(st.type){
   case T_FILE:
-    printf(1, "%s %d %d %d\n", fmtname(path), st.type, st.ino, st.size);
+    printf(1, "%s %d %d %d\n", fname(path), st.type, st.ino, st.size);
     break;
 
   case T_DIR:
@@ -63,15 +60,14 @@ ls(char *path)
         printf(1, "ls: cannot stat %s\n", buf);
         continue;
       }
-      printf(1, "%s %d %d %d\n", fmtname(buf), st.type, st.ino, st.size);
+      printf(1, "%s %d %d %d\n", fname(buf), st.type, st.ino, st.size);
     }
     break;
   }
   close(fd);
 }
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
   int i;
 

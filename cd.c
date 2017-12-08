@@ -6,11 +6,11 @@
 int main(int argc, char *argv[])
 {
   if(argc < 2){
-    printf(1, "Use this arguments: cd [path/dir]\n");
+    printf(1, "Use this arguments: cd directory\n");
     exit();
   }
-  else{
-    chdir(argv[1]);
+  if(chdir(argv[1]) < 0){
+    printf(1, "Cannot change directory\n");
   }
   exit();
 }
