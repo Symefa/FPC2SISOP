@@ -2,12 +2,13 @@
 // File descriptors
 //
 
-#include <sys/types.h>
-#include <sys/file.h>
-#include <xv6/param.h>
-#include <xv6/fs.h>
+#include "types.h"
 #include "defs.h"
+#include "param.h"
+#include "fs.h"
 #include "spinlock.h"
+#include "sleeplock.h"
+#include "file.h"
 
 struct devsw devsw[NDEV];
 struct {
@@ -56,7 +57,6 @@ void
 fileclose(struct file *f)
 {
   struct file ff;
-  extern void* memcpy(void*, const void*, uint);
 
   acquire(&ftable.lock);
   if(f->ref < 1)
@@ -65,8 +65,7 @@ fileclose(struct file *f)
     release(&ftable.lock);
     return;
   }
-  //ff = *f;
-  memcpy(&ff,f,sizeof(ff));
+  ff = *f;
   f->ref = 0;
   f->type = FD_NONE;
   release(&ftable.lock);
@@ -113,6 +112,7 @@ fileread(struct file *f, char *addr, int n)
   panic("fileread");
 }
 
+//PAGEBREAK!
 // Write to file f.
 int
 filewrite(struct file *f, char *addr, int n)
@@ -154,3 +154,4 @@ filewrite(struct file *f, char *addr, int n)
   }
   panic("filewrite");
 }
+

@@ -1,11 +1,12 @@
-#include <sys/types.h>
-#include <sys/file.h>
-#include <xv6/param.h>
-#include <xv6/fs.h>
+#include "types.h"
 #include "defs.h"
+#include "param.h"
 #include "mmu.h"
 #include "proc.h"
+#include "fs.h"
 #include "spinlock.h"
+#include "sleeplock.h"
+#include "file.h"
 
 #define PIPESIZE 512
 
@@ -44,6 +45,7 @@ pipealloc(struct file **f0, struct file **f1)
   (*f1)->pipe = p;
   return 0;
 
+//PAGEBREAK: 20
  bad:
   if(p)
     kfree((char*)p);
@@ -72,6 +74,7 @@ pipeclose(struct pipe *p, int writable)
     release(&p->lock);
 }
 
+//PAGEBREAK: 40
 int
 pipewrite(struct pipe *p, char *addr, int n)
 {
@@ -80,7 +83,7 @@ pipewrite(struct pipe *p, char *addr, int n)
   acquire(&p->lock);
   for(i = 0; i < n; i++){
     while(p->nwrite == p->nread + PIPESIZE){  //DOC: pipewrite-full
-      if(p->readopen == 0 || proc->killed){
+      if(p->readopen == 0 || myproc()->killed){
         release(&p->lock);
         return -1;
       }
@@ -101,7 +104,7 @@ piperead(struct pipe *p, char *addr, int n)
 
   acquire(&p->lock);
   while(p->nread == p->nwrite && p->writeopen){  //DOC: pipe-empty
-    if(proc->killed){
+    if(myproc()->killed){
       release(&p->lock);
       return -1;
     }

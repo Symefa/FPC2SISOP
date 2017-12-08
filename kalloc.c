@@ -2,15 +2,16 @@
 // memory for user processes, kernel stacks, page table pages,
 // and pipe buffers. Allocates 4096-byte pages.
 
-#include <sys/types.h>
-#include <xv6/param.h>
+#include "types.h"
 #include "defs.h"
+#include "param.h"
 #include "memlayout.h"
 #include "mmu.h"
 #include "spinlock.h"
 
 void freerange(void *vstart, void *vend);
 extern char end[]; // first address after kernel loaded from ELF file
+                   // defined by the kernel linker script in kernel.ld
 
 struct run {
   struct run *next;
@@ -45,12 +46,12 @@ kinit2(void *vstart, void *vend)
 void
 freerange(void *vstart, void *vend)
 {
-  uint p;
-  p = PGROUNDUP((uint)vstart);
-  for(; p + PGSIZE <= (uint)vend; p += PGSIZE)
-    kfree((char*)p);
+  char *p;
+  p = (char*)PGROUNDUP((uint)vstart);
+  for(; p + PGSIZE <= (char*)vend; p += PGSIZE)
+    kfree(p);
 }
-
+//PAGEBREAK: 21
 // Free the page of physical memory pointed at by v,
 // which normally should have been returned by a
 // call to kalloc().  (The exception is when
@@ -60,10 +61,11 @@ kfree(char *v)
 {
   struct run *r;
 
-  if((uint)v % PGSIZE || v < end || v2p(v) >= PHYSTOP)
+  if((uint)v % PGSIZE || v < end || V2P(v) >= PHYSTOP)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
+  memset(v, 1, PGSIZE);
 
   if(kmem.use_lock)
     acquire(&kmem.lock);
@@ -92,28 +94,3 @@ kalloc(void)
   return (char*)r;
 }
 
-// Allocate one page colored with col.
-// GAIA architecture now needs page coloring.
-char*
-kalloc_with_color(int col)
-{
-  struct run *r, *edge = 0;
-
-  if(kmem.use_lock)
-    acquire(&kmem.lock);
-  r = kmem.freelist;
-  do{
-    if(PGCOLOR(r) == col)
-      break; // found
-    edge = r;
-  }while(r && (r = r->next));
-  if(r){
-    if(edge == 0)
-      kmem.freelist = r->next;
-    else
-      edge->next = r->next;
-  }
-  if(kmem.use_lock)
-    release(&kmem.lock);
-  return (char*)r;
-}

@@ -4,15 +4,17 @@
 // user code, and calls into file.c and fs.c.
 //
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/file.h>
-#include <fcntl.h>
-#include <xv6/param.h>
-#include <xv6/fs.h>
+#include "types.h"
 #include "defs.h"
+#include "param.h"
+#include "stat.h"
 #include "mmu.h"
 #include "proc.h"
+#include "fs.h"
+#include "spinlock.h"
+#include "sleeplock.h"
+#include "file.h"
+#include "fcntl.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -24,7 +26,7 @@ argfd(int n, int *pfd, struct file **pf)
 
   if(argint(n, &fd) < 0)
     return -1;
-  if(fd < 0 || fd >= NOFILE || (f=proc->ofile[fd]) == 0)
+  if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
     return -1;
   if(pfd)
     *pfd = fd;
@@ -39,10 +41,11 @@ static int
 fdalloc(struct file *f)
 {
   int fd;
+  struct proc *curproc = myproc();
 
   for(fd = 0; fd < NOFILE; fd++){
-    if(proc->ofile[fd] == 0){
-      proc->ofile[fd] = f;
+    if(curproc->ofile[fd] == 0){
+      curproc->ofile[fd] = f;
       return fd;
     }
   }
@@ -54,7 +57,7 @@ sys_dup(void)
 {
   struct file *f;
   int fd;
-  
+
   if(argfd(0, 0, &f) < 0)
     return -1;
   if((fd=fdalloc(f)) < 0)
@@ -92,10 +95,10 @@ sys_close(void)
 {
   int fd;
   struct file *f;
-  
+
   if(argfd(0, &fd, &f) < 0)
     return -1;
-  proc->ofile[fd] = 0;
+  myproc()->ofile[fd] = 0;
   fileclose(f);
   return 0;
 }
@@ -105,7 +108,7 @@ sys_fstat(void)
 {
   struct file *f;
   struct stat *st;
-  
+
   if(argfd(0, 0, &f) < 0 || argptr(1, (void*)&st, sizeof(*st)) < 0)
     return -1;
   return filestat(f, st);
@@ -167,23 +170,22 @@ isdirempty(struct inode *dp)
 {
   int off;
   struct dirent de;
-  char xde[XDIRSIZE];
 
-  for(off=2*sizeof(xde); off<dp->size; off+=sizeof(xde)){
-    if(readi(dp, xde, off, sizeof(xde)) != sizeof(xde))
+  for(off=2*sizeof(de); off<dp->size; off+=sizeof(de)){
+    if(readi(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
       panic("isdirempty: readi");
-    xdirent2gaia(xde, &de);
     if(de.inum != 0)
       return 0;
   }
   return 1;
 }
 
+//PAGEBREAK!
 int
 sys_unlink(void)
 {
   struct inode *ip, *dp;
-  char xde[XDIRSIZE];
+  struct dirent de;
   char name[DIRSIZ], *path;
   uint off;
 
@@ -213,8 +215,8 @@ sys_unlink(void)
     goto bad;
   }
 
-  memset(xde, 0, sizeof(xde));
-  if(writei(dp, xde, off, sizeof(xde)) != sizeof(xde))
+  memset(&de, 0, sizeof(de));
+  if(writei(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
     panic("unlink: writei");
   if(ip->type == T_DIR){
     dp->nlink--;
@@ -352,11 +354,10 @@ sys_mknod(void)
 {
   struct inode *ip;
   char *path;
-  int len;
   int major, minor;
-  
+
   begin_op();
-  if((len=argstr(0, &path)) < 0 ||
+  if((argstr(0, &path)) < 0 ||
      argint(1, &major) < 0 ||
      argint(2, &minor) < 0 ||
      (ip = create(path, T_DEV, major, minor)) == 0){
@@ -373,7 +374,8 @@ sys_chdir(void)
 {
   char *path;
   struct inode *ip;
-
+  struct proc *curproc = myproc();
+  
   begin_op();
   if(argstr(0, &path) < 0 || (ip = namei(path)) == 0){
     end_op();
@@ -386,9 +388,9 @@ sys_chdir(void)
     return -1;
   }
   iunlock(ip);
-  iput(proc->cwd);
+  iput(curproc->cwd);
   end_op();
-  proc->cwd = ip;
+  curproc->cwd = ip;
   return 0;
 }
 
@@ -400,27 +402,20 @@ sys_exec(void)
   uint uargv, uarg;
 
   if(argstr(0, &path) < 0 || argint(1, (int*)&uargv) < 0){
-    cprintf("sys_exec error1\n");
     return -1;
   }
   memset(argv, 0, sizeof(argv));
   for(i=0;; i++){
-    if(i >= NELEM(argv)) {
-      cprintf("sys_exec error2\n");
+    if(i >= NELEM(argv))
       return -1;
-    }
-    if(fetchint(uargv+4*i, (int*)&uarg) < 0) {
-      cprintf("sys_exec error3\n");
+    if(fetchint(uargv+4*i, (int*)&uarg) < 0)
       return -1;
-    }
     if(uarg == 0){
       argv[i] = 0;
       break;
     }
-    if(fetchstr(uarg, &argv[i]) < 0) {
-      cprintf("sys_exec error4\n");
+    if(fetchstr(uarg, &argv[i]) < 0)
       return -1;
-    }
   }
   return exec(path, argv);
 }
@@ -439,7 +434,7 @@ sys_pipe(void)
   fd0 = -1;
   if((fd0 = fdalloc(rf)) < 0 || (fd1 = fdalloc(wf)) < 0){
     if(fd0 >= 0)
-      proc->ofile[fd0] = 0;
+      myproc()->ofile[fd0] = 0;
     fileclose(rf);
     fileclose(wf);
     return -1;
@@ -447,21 +442,4 @@ sys_pipe(void)
   fd[0] = fd0;
   fd[1] = fd1;
   return 0;
-}
-
-int
-sys_ioctl(void)
-{
-  int fd;
-  struct file *f;
-  int request;
-  
-  if(argfd(0, &fd, &f) < 0 || argint(1, &request) < 0)
-    return -1;
-  if(f->ip->type != T_DEV)
-    return -1;
-
-  if(f->ip->major < 0 || f->ip->major >= NDEV || !devsw[f->ip->major].ioctl)
-    return -1;
-  return devsw[f->ip->major].ioctl(f->ip, request);
 }

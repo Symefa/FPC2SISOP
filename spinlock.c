@@ -1,9 +1,9 @@
 // Mutual exclusion spin locks.
 
-#include <sys/types.h>
-#include <xv6/param.h>
+#include "types.h"
 #include "defs.h"
-#include "gaia.h"
+#include "param.h"
+#include "x86.h"
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
@@ -28,14 +28,17 @@ acquire(struct spinlock *lk)
   if(holding(lk))
     panic("acquire");
 
-  // We can always get lock because we support only uni-processor and
-  // xv6 never holds lock when interrupts enabled.
-  if (lk->locked)
-    panic("acquire: The lock is acquired unexpectedly");
-  lk->locked = 1;
+  // The xchg is atomic.
+  while(xchg(&lk->locked, 1) != 0)
+    ;
+
+  // Tell the C compiler and the processor to not move loads or stores
+  // past this point, to ensure that the critical section's memory
+  // references happen after the lock is acquired.
+  __sync_synchronize();
 
   // Record info about lock acquisition for debugging.
-  lk->cpu = cpu;
+  lk->cpu = mycpu();
   getcallerpcs(&lk, lk->pcs);
 }
 
@@ -49,20 +52,28 @@ release(struct spinlock *lk)
   lk->pcs[0] = 0;
   lk->cpu = 0;
 
-  lk->locked = 0;
+  // Tell the C compiler and the processor to not move loads or stores
+  // past this point, to ensure that all the stores in the critical
+  // section are visible to other cores before the lock is released.
+  // Both the C compiler and the hardware may re-order loads and
+  // stores; __sync_synchronize() tells them both not to.
+  __sync_synchronize();
+
+  // Release the lock, equivalent to lk->locked = 0.
+  // This code can't use a C assignment, since it might
+  // not be atomic. A real OS would use C atomics here.
+  asm volatile("movl $0, %0" : "+m" (lk->locked) : );
 
   popcli();
 }
 
-// Record the current call stack in pcs[] by following the %ebp chain in x86.
-// In GAIA architecture, we have no method to detect all callers right now.
-// This function does not work at all.
+// Record the current call stack in pcs[] by following the %ebp chain.
 void
 getcallerpcs(void *v, uint pcs[])
 {
   uint *ebp;
   int i;
-  
+
   ebp = (uint*)v - 2;
   for(i = 0; i < 10; i++){
     if(ebp == 0 || ebp < (uint*)KERNBASE || ebp == (uint*)0xffffffff)
@@ -78,7 +89,7 @@ getcallerpcs(void *v, uint pcs[])
 int
 holding(struct spinlock *lock)
 {
-  return lock->locked && lock->cpu == cpu;
+  return lock->locked && lock->cpu == mycpu();
 }
 
 
@@ -89,22 +100,23 @@ holding(struct spinlock *lock)
 void
 pushcli(void)
 {
-  uchar iflg;
-  
-  iflg = is_interruptible();
+  int eflags;
+
+  eflags = readeflags();
   cli();
-  if(cpu->ncli++ == 0)
-    cpu->intena = (int)iflg;
+  if(mycpu()->ncli == 0)
+    mycpu()->intena = eflags & FL_IF;
+  mycpu()->ncli += 1;
 }
 
 void
 popcli(void)
 {
-  if(is_interruptible())
+  if(readeflags()&FL_IF)
     panic("popcli - interruptible");
-  if(--cpu->ncli < 0)
+  if(--mycpu()->ncli < 0)
     panic("popcli");
-  if(cpu->ncli == 0 && cpu->intena)
+  if(mycpu()->ncli == 0 && mycpu()->intena)
     sti();
 }
 
