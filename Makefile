@@ -118,6 +118,7 @@ UPROGS=\
 	_kill\
 	_ln\
 	_ls\
+	_md5\
 	_mkdir\
 	_rm\
 	_sh\
