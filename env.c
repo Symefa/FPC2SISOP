@@ -1,27 +1,15 @@
-    /*
+//environment variable
 
-     * C Program to Print Environment variables
+#include <stdio.h>
 
-     */
+void main(int argc, char *argv[], char * envp[]){
 
-    #include <stdio.h>
-
-     
-
-    void main(int argc, char *argv[], char * envp[])
-
-    {
-
-        int i;
+	int i;
 
      
 
         for (i = 0; envp[i] != NULL; i++)
-
         {    
-
             printf("\n%s", envp[i]);
-
         }
-
-    }
+}
