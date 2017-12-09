@@ -24,23 +24,23 @@ void ls(char *path)
 {
   char buf[512], *p;
   int fd;
-  struct dirent de;
-  struct stat st;
+  struct dirent d;
+  struct stat s;
 
   if((fd = open(path, 0)) < 0){
     printf(2, "ls: cannot open %s\n", path);
     return;
   }
 
-  if(fstat(fd, &st) < 0){
+  if(fstat(fd, &s) < 0){
     printf(2, "ls: cannot stat %s\n", path);
     close(fd);
     return;
   }
 
-  switch(st.type){
+  switch(s.type){
   case T_FILE:
-    printf(1, "%s %d %d %d\n", fname(path), st.type, st.ino, st.size);
+    printf(1, "%s %d %d %d\n", fname(path), s.type, s.ino, s.size);
     break;
 
   case T_DIR:
@@ -51,16 +51,16 @@ void ls(char *path)
     strcpy(buf, path);
     p = buf+strlen(buf);
     *p++ = '/';
-    while(read(fd, &de, sizeof(de)) == sizeof(de)){
-      if(de.inum == 0)
+    while(read(fd, &d, sizeof(d)) == sizeof(d)){
+      if(d.inum == 0)
         continue;
-      memmove(p, de.name, DIRSIZ);
+      memmove(p, d.name, DIRSIZ);
       p[DIRSIZ] = 0;
-      if(stat(buf, &st) < 0){
+      if(stat(buf, &s) < 0){
         printf(1, "ls: cannot stat %s\n", buf);
         continue;
       }
-      printf(1, "%s %d %d %d\n", fname(buf), st.type, st.ino, st.size);
+      printf(1, "%s %d %d %d\n", fname(buf), s.type, s.ino, s.size);
     }
     break;
   }
