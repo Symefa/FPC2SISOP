@@ -164,6 +164,7 @@ UPROGS=\
 	_forktest\
 	_grep\
 	_init\
+	_env\
 	_kill\
 	_ln\
 	_ls\
@@ -251,6 +252,7 @@ EXTRA=\
 	printf.c umalloc.c\
 	cp.c touch.c cd.c mv.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
+	env.c\
 	.gdbinit.tmpl gdbutil\
 
 dist:

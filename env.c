@@ -1,15 +1,15 @@
-//environment variable
+#include "types.h"
+#include "stat.h"
+#include "user.h"
 
-#include <stdio.h>
+char *envp[] = environ;
 
-void main(int argc, char *argv[], char * envp[]){
+int main(int argc, char *argv[]){
 
-	int i;
+    for(int i=0;envp[i]>0;i++){
 
-     
+        printf(1,"%s\n",envp[i]);
+    }
 
-        for (i = 0; envp[i] != NULL; i++)
-        {    
-            printf("\n%s", envp[i]);
-        }
+    exit();
 }
