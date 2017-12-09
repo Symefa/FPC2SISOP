@@ -5,7 +5,7 @@ Command | Options | Status | Comment
 `ls`  | `default` | <center> :white_check_mark: </center>
 `touch`  | `default` | <center> :white_check_mark: </center>
 `cd`  | `default` |<center> :exclamation: </center>
-`rm`  | `default` </br `-rf` | <center> :white_check_mark:</br>:exclamation:</center> | -rf stil buggy
+`rm`  | `default` </br> `-rf` | <center> :white_check_mark:</br>:exclamation:</center> | -rf stil buggy
 `md5sum`  | `default` | <center> :x: </center>
 `env`  | `default` | <center> :x: </center>
 `rename`  | `default` | <center> :x: </center> 
